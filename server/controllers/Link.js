@@ -1,8 +1,8 @@
-
-const uuid = require("uuid");
-const { nanoid } = require("nanoid"); 
+const { nanoid } = require("nanoid");
+const UAParser = require("ua-parser-js");
+const parser = new UAParser();
 const Link = require("../models/Link");
-const LinkStats=require('../models/LinkStats')
+const LinkStats = require("../models/LinkStats");
 const errorResponse = (res, statusCode, message) => {
   return res.status(statusCode).json({
     success: false,
@@ -10,44 +10,58 @@ const errorResponse = (res, statusCode, message) => {
   });
 };
 
-const createLink=async (req,res)=>{
-    try{
-      const { url,remark,expiredAt} = req.body;
-      const {userId}=req.user;
-      console.log(userId);
-      if(!url || !remark){
-        return errorResponse(res, 400, "Destination Url and remark cannot be empty");
-      } 
-       const uniqueID = nanoid(6);
-      const shortUrl = `https://yourdomain.com/${uniqueID}`;
-    const ipAddress = req.ip || req.headers['x-forwarded-for'];
-    const userDevice = req.device.type;
-    const userDeviceInfo = {
-      type: userDevice,
-      userAgent: req.headers['user-agent'], 
-    };
-      await Link.create({
-        url,
-        shortUrl,
-        userId,
-        expiredAt: expiredAt ? expiredAt : null,
-        userDevice: userDeviceInfo?.userAgent || userDevice,
-        ipAddress,
-        remark,
-        uniqueId: uniqueID
-      });
-      return res.status(201).json({
-        success: true,
-        message: "Link Created Successfully..",
-      });
-    }catch(err){
-     console.error("Signup error:", err);
-     errorResponse(res, 500, "Server error. Please try again.");
+
+
+const getUserDeviceInfo = (req) => {
+  const userAgentString = req.headers["user-agent"]; 
+  parser.setUA(userAgentString); 
+
+  const result = parser.getResult(); 
+
+  return {
+    browser: result.browser.name,
+    platform: result.os.name, 
+    userAgent: userAgentString,
+  };
+};
+const createLink = async (req, res) => {
+  try {
+    const { url, remark, expiredAt } = req.body;
+    const { userId } = req.user;
+    if (!url || !remark) {
+      return errorResponse(
+        res,
+        400,
+        "Destination Url and remark cannot be empty"
+      );
     }
-}
+    let userDeviceInfo = getUserDeviceInfo(req);
+    const uniqueID = nanoid(6);
+    const shortUrl = `https://yourdomain.com/${uniqueID}`;
+    const ipAddress = req.ip || req.headers["x-forwarded-for"];
+    let device = userDeviceInfo.platform ? userDeviceInfo.platform : "Postman";
+    await Link.create({
+      url,
+      shortUrl,
+      userId,
+      expiredAt: expiredAt ? expiredAt : null,
+      userDevice: device,
+      ipAddress,
+      remark,
+      uniqueId: uniqueID,
+    });
+    return res.status(201).json({
+      success: true,
+      message: "Link Created Successfully..",
+    });
+  } catch (err) {
+    console.error("Signup error:", err);
+    errorResponse(res, 500, "Server error. Please try again.");
+  }
+};
 const editLink = async (req, res) => {
   try {
-    const { id } = req.params; 
+    const { id } = req.params;
     const { url, remark, expiredAt } = req.body;
     const { userId } = req.user;
 
@@ -55,9 +69,9 @@ const editLink = async (req, res) => {
     if (!url && !remark && !expiredAt) {
       return errorResponse(res, 400, "No valid fields to update.");
     }
-   
+
     // Find the link
-    const link = await Link.findOne({ _id:id,userId });
+    const link = await Link.findOne({ _id: id, userId });
     if (!link) {
       return errorResponse(res, 404, "Link not found.");
     }
@@ -67,7 +81,7 @@ const editLink = async (req, res) => {
     if (url) updateFields.url = url;
     if (remark) updateFields.remark = remark;
     if (expiredAt !== undefined) updateFields.expiredAt = expiredAt;
-   
+
     // Update the link
     const updatedLink = await Link.findByIdAndUpdate(id, updateFields, {
       new: true,
@@ -85,14 +99,14 @@ const editLink = async (req, res) => {
 };
 const deleteLink = async (req, res) => {
   try {
-    const { id } = req.params; 
+    const { id } = req.params;
     const { userId } = req.user;
     const link = await Link.findOne({ _id: id, userId });
 
     if (!link) {
       return errorResponse(res, 404, "Link not found.");
     }
-    await LinkStats.deleteMany({ linkId:id});
+    await LinkStats.deleteMany({ linkId: id });
     await Link.deleteOne({ _id: id });
 
     return res.status(200).json({
@@ -107,18 +121,18 @@ const deleteLink = async (req, res) => {
 
 const getAnalytics = async (req, res) => {
   try {
-    const { search, timestampOrder ,page=1,limit=10} = req.query;
+    const { search, timestampOrder, page = 1, limit = 10 } = req.query;
     const { userId } = req.user;
-    const orderDirection = timestampOrder === "desc" ? -1 : 1; 
-    const query = { userId }; 
+    const orderDirection = timestampOrder === "desc" ? -1 : 1;
+    const query = { userId };
     if (search) {
-      query.remark = { $regex: search, $options: "i" }; 
+      query.remark = { $regex: search, $options: "i" };
     }
-     const pageNumber = parseInt(page);
-     const limitNumber = parseInt(limit);
-     const skip = (pageNumber - 1) * limitNumber;
+    const pageNumber = parseInt(page);
+    const limitNumber = parseInt(limit);
+    const skip = (pageNumber - 1) * limitNumber;
     const links = await Link.find(query)
-      .sort({ createdAt: orderDirection }) 
+      .sort({ createdAt: orderDirection })
       .select("createdAt url shortUrl ipAddress userDevice remark")
       .skip(skip)
       .limit(limitNumber)
@@ -130,9 +144,9 @@ const getAnalytics = async (req, res) => {
       data: {
         pageSize: limitNumber,
         pageNo: pageNumber,
-        totalCount:totalLink,
+        totalCount: totalLink,
         items: links,
-      }
+      },
     });
   } catch (err) {
     console.error("Error in getAnalytics:", err);
@@ -201,7 +215,7 @@ const getAllLinks = async (req, res) => {
     const linkIds = updatedLinks.map((link) => link._id);
 
     const clickCounts = await LinkStats.aggregate([
-      { $match: { linkId: { $in: linkIds } } }, 
+      { $match: { linkId: { $in: linkIds } } },
       {
         $group: {
           _id: "$linkId",
@@ -234,33 +248,31 @@ const getAllLinks = async (req, res) => {
   }
 };
 
-const getUrl=async (req,res)=>{
-    try{
-          const {id}=req.query;
-          const link = await Link.findOne({ uniqueId:id}).select("_id expiredAt url");
-          if(!link){
-            return errorResponse(
-              res,
-              404,
-              "Invalid link.."
-            );
-          }
-          const currentDate = new Date();
-          if (link.expiredAt && currentDate > new Date(link.expiredAt)) {
-            return errorResponse(res, 404, "Link has been expired...");
-          }
-          const userDevice = req.device.type;
-          await LinkStats.create({linkId:link._id,clickDevice:userDevice})
-          return res.status(200).json({
-          success: true,
-          message: "Fetched link details.",
-          url: link?.url
-        });
-        }catch(err){
-          console.error("Error in updating profile:", err);
-          errorResponse(res, 500, "Server error. Please try again.");
-        }
-}
+const getUrl = async (req, res) => {
+  try {
+    const { id } = req.query;
+    const link = await Link.findOne({ uniqueId: id }).select(
+      "_id expiredAt url"
+    );
+    if (!link) {
+      return errorResponse(res, 404, "Invalid link..");
+    }
+    const currentDate = new Date();
+    if (link.expiredAt && currentDate > new Date(link.expiredAt)) {
+      return errorResponse(res, 404, "Link has been expired...");
+    }
+    const userDevice = req.device.type;
+    await LinkStats.create({ linkId: link._id, clickDevice: userDevice });
+    return res.status(200).json({
+      success: true,
+      message: "Fetched link details.",
+      url: link?.url,
+    });
+  } catch (err) {
+    console.error("Error in updating profile:", err);
+    errorResponse(res, 500, "Server error. Please try again.");
+  }
+};
 
 module.exports = {
   createLink,
@@ -268,5 +280,5 @@ module.exports = {
   deleteLink,
   getAnalytics,
   getAllLinks,
-  getUrl
-}; 
+  getUrl,
+};
