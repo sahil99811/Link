@@ -37,7 +37,8 @@ const createLink = async (req, res) => {
     }
     let userDeviceInfo = getUserDeviceInfo(req);
     const uniqueID = nanoid(6);
-    const shortUrl = `https://yourdomain.com/${uniqueID}`;
+    console.log(process.env.FRONTEND_BASE_URL)
+    const shortUrl = `${process.env.FRONTEND_BASE_URL}/${uniqueID}`;
     const ipAddress = req.ip || req.headers["x-forwarded-for"];
     let device = userDeviceInfo.platform ? userDeviceInfo.platform : "Postman";
     await Link.create({

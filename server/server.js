@@ -34,7 +34,7 @@ app.use('/api/v1/profile',profileRoutes)
 // Connect to the database
 dbConnect()
   .then(() => {
-    console.log("Database connected successfully");
+    console.log("Database connected successfully");y
 
     // Start the server on the port defined in environment variables
     const server = app.listen(process.env.PORT, () => {
