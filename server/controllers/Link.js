@@ -213,7 +213,7 @@ const getAllLinks = async (req, res) => {
       });
     }
 
-    const linkIds = updatedLinks.map((link) => link._id.toString();
+    const linkIds = updatedLinks.map((link) => link._id.toString());
     console.log(linkIds);
     const clickCounts = await LinkStats.aggregate([
       { $match: { linkId: { $in: linkIds } } },
