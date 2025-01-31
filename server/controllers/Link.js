@@ -190,7 +190,7 @@ const getAllLinks = async (req, res) => {
     // Fetch links from the database
     const links = await Link.find(query)
       .sort({ createdAt: timestampDirection }) // Sorting by 'createdAt' timestamp first
-      .select("createdAt url shortUrl ipAddress userDevice remark expiredAt") // Select necessary fields
+      .select("_id createdAt url shortUrl ipAddress userDevice remark expiredAt") // Select necessary fields
       .skip(skip)
       .limit(limitNumber)
       .lean();
@@ -214,7 +214,7 @@ const getAllLinks = async (req, res) => {
     }
 
     const linkIds = updatedLinks.map((link) => link._id);
-
+    console.log(linkIds);
     const clickCounts = await LinkStats.aggregate([
       { $match: { linkId: { $in: linkIds } } },
       {
@@ -224,6 +224,7 @@ const getAllLinks = async (req, res) => {
         },
       },
     ]);
+    console.log(clickCounts);
     updatedLinks.forEach((link) => {
       const clickData = clickCounts.find(
         (click) => click._id.toString() === link._id.toString()
